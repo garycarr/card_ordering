@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+# This script is intended for execution in a continuous integration environment
+# (ex. Jenkins). It checks that files are formatted with gofmt, generates test
+# result files, and coverage consumable by cobertura. It build under a local
+# _build directory (since Jenkins does not have a GOPATH workspace) and creates
+# a final built binary in that directory for archiving.
+
+set -e
+
+# Change directory to the root of this repository
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+APP="card_ordering"
+
+# Create a GOPATH workspace at under _build/
+mkdir -p _build/src/github.com/garycarr
+rm -f _build/src/github.com/garycarr/$APP
+ln -s $PWD _build/src/github.com/garycarr/$APP
+export GOPATH=$PWD/_build
+export PATH=$GOPATH/bin:$PATH
+
+cd _build/src/github.com/garycarr/$APP
+
+# Install tools required for tests and build artifacts
+go get -v github.com/jstemmer/go-junit-report
+go get -v github.com/wadey/gocovmerge
+go get -v github.com/t-yuki/gocover-cobertura
+
+export PKGS=$(go list ./... | grep -v '/vendor/' | grep -v '/resources')
+export PKGS_DELIM=$(echo "$PKGS" | paste -sd "," -)
+
+# Make sure all files have been run through gofmt
+gofmt_output=$(gofmt -l $(find . -type f -name '*.go' -not -path './vendor/*' -not -path './_build/*'))
+if [[ ! -z "$gofmt_output" ]]; then
+    echo "One or more files were not run through gofmt:"
+    echo $gofmt_output
+    exit 1
+fi
+
+# Run unit tests and output the JUnit test report along with the Cobertura code coverage report
+# The final code coverage report is a merged version of all packages against all other packages
+# Complicated command came from here: https://github.com/golang/go/issues/6909#issuecomment-232878416
+mkdir -p _build
+
+go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}go test -v -parallel 4 -covermode count -coverprofile {{.Name}}_{{len .Imports}}_{{len .Deps}}.coverprofile -coverpkg $PKGS_DELIM {{.ImportPath}}{{end}}' $PKGS | xargs -I {} bash -c {} | tee _build/output.log | go-junit-report > _build/tests.xml
+
+if [ "${PIPESTATUS[1]}" -ne 0 ]; then
+    echo "Failed one or more tests. Check the report in _build/tests.xml and _build/output.log for details, or run 'go test \$(go list ./... | grep -v '/vendor/')'."
+    rm *.coverprofile
+    exit 1
+fi
+
+gocovmerge `ls *.coverprofile` | gocover-cobertura > _build/coverage.xml
+rm *.coverprofile
+
+# Produce the binary as a build artifact with the server version set
+go build -o _build/$APP
+echo "Success!"

@@ -1,0 +1,11 @@
+golang-card-ordering:
+  build: .
+  environment:
+      - ENV_SET=true
+      - MAX_DECK_SIZE=20
+      - MAX_SHUFFLES=-1
+      - PRINT_EVERY=100000
+      - START_DECK_SIZE=5
+      - VERBOSE=true
+  ports:
+      - "3000:3000"
