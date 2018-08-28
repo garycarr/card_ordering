@@ -18,9 +18,9 @@ func (a *app) shuffleAndCheck(deckSize int) {
 		deck[index] = i
 		i++
 	}
+	rand.Seed(time.Now().UnixNano())
 	// Keep looping until we have a deck of cards shuffled in order
-	for i := 0; i != *maxShuffles; i++ {
-		rand.Seed(time.Now().UnixNano())
+	for i := 0; i != a.conf.maxShuffles; i++ {
 		// Shuffle the deck
 		numShuffles := rand.Intn(10) + 10
 		for count := 0; count < numShuffles; count++ {

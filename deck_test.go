@@ -35,3 +35,15 @@ func TestCheckDeckOrder(t *testing.T) {
 		assert.Equal(t, td.expBool, tF.app.checkDeckOrder(td.deck), td.description)
 	}
 }
+
+func BenchmarkShuffleDeck1000(b *testing.B) {
+	shuffleDeckBenchTest(b)
+}
+
+func shuffleDeckBenchTest(b *testing.B) {
+	b.ReportAllocs()
+	tF := createTestFixture(Config{})
+	defer tF.cleanup()
+	tF.app.conf.maxShuffles = 1
+	tF.app.shuffleAndCheck(1000000)
+}
